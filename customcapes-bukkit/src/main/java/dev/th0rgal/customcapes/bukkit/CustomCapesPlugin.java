@@ -2,11 +2,17 @@ package dev.th0rgal.customcapes.bukkit;
 
 import dev.th0rgal.customcapes.bukkit.commands.CapeCommand;
 import dev.th0rgal.customcapes.core.api.CapesApiClient;
+import dev.th0rgal.customcapes.core.api.CapesListResponse;
 import dev.th0rgal.customcapes.core.config.Config;
 import net.kyori.adventure.platform.bukkit.BukkitAudiences;
 import org.bstats.bukkit.Metrics;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+
+import java.util.List;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Main entry point for the Custom Capes Bukkit/Paper plugin.
@@ -19,6 +25,13 @@ public final class CustomCapesPlugin extends JavaPlugin {
     private CapesApiClient apiClient;
     private BukkitAudiences audiences;
     private SkinApplierBukkit skinApplier;
+    
+    /** Cached list of available capes from the API */
+    private volatile List<CapesListResponse.CapeInfo> availableCapes;
+    /** Set of available cape IDs for quick lookup */
+    private final Set<String> availableCapeIds = ConcurrentHashMap.newKeySet();
+    /** The backend type being used by the API */
+    private volatile String apiBackend = "unknown";
 
     @Override
     public void onEnable() {
@@ -46,12 +59,33 @@ public final class CustomCapesPlugin extends JavaPlugin {
 
         getLogger().info("Custom Capes enabled! API: " + config.getApiUrl());
 
-        // Check API health in background
+        // Fetch available capes from API in background
+        refreshAvailableCapes();
+    }
+
+    /**
+     * Refresh the list of available capes from the API.
+     */
+    public void refreshAvailableCapes() {
         getServer().getScheduler().runTaskAsynchronously(this, () -> {
-            if (apiClient.isHealthy()) {
-                getLogger().info("Capes API is reachable and healthy.");
-            } else {
-                getLogger().warning("Capes API is not reachable at " + config.getApiUrl());
+            try {
+                CapesListResponse response = apiClient.getAvailableCapes();
+                availableCapes = response.getCapes();
+                apiBackend = response.getBackend() != null ? response.getBackend() : "unknown";
+                
+                // Update available IDs set
+                availableCapeIds.clear();
+                for (CapesListResponse.CapeInfo cape : availableCapes) {
+                    if (cape.isAvailable()) {
+                        availableCapeIds.add(cape.getId().toLowerCase());
+                    }
+                }
+                
+                long availableCount = availableCapes.stream().filter(CapesListResponse.CapeInfo::isAvailable).count();
+                getLogger().info("Fetched " + availableCount + "/" + availableCapes.size() + 
+                    " available capes from API (backend: " + apiBackend + ")");
+            } catch (CapesApiClient.CapesApiException e) {
+                getLogger().warning("Failed to fetch available capes: " + e.getMessage());
             }
         });
     }
@@ -71,6 +105,7 @@ public final class CustomCapesPlugin extends JavaPlugin {
     public void reload() {
         config = Config.load(getDataFolder());
         apiClient = new CapesApiClient(config.getApiUrl(), config.getTimeoutSeconds());
+        refreshAvailableCapes();
         getLogger().info("Configuration reloaded.");
     }
 
@@ -97,6 +132,30 @@ public final class CustomCapesPlugin extends JavaPlugin {
     @NotNull
     public SkinApplierBukkit getSkinApplier() {
         return skinApplier;
+    }
+
+    /**
+     * Get the cached list of available capes from the API.
+     * May be null if not yet fetched.
+     */
+    @Nullable
+    public List<CapesListResponse.CapeInfo> getAvailableCapes() {
+        return availableCapes;
+    }
+
+    /**
+     * Check if a cape type ID is available.
+     */
+    public boolean isCapeAvailable(@NotNull String capeId) {
+        return availableCapeIds.contains(capeId.toLowerCase());
+    }
+
+    /**
+     * Get the API backend type ("mineskin" or "internal").
+     */
+    @NotNull
+    public String getApiBackend() {
+        return apiBackend;
     }
 }
 

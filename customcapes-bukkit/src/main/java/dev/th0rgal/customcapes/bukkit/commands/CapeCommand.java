@@ -2,6 +2,7 @@ package dev.th0rgal.customcapes.bukkit.commands;
 
 import dev.th0rgal.customcapes.bukkit.CustomCapesPlugin;
 import dev.th0rgal.customcapes.core.api.CapesApiClient;
+import dev.th0rgal.customcapes.core.api.CapesListResponse;
 import dev.th0rgal.customcapes.core.config.Config;
 import dev.th0rgal.customcapes.core.model.CapeType;
 import dev.th0rgal.customcapes.core.model.SkinProperty;
@@ -20,7 +21,6 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -76,11 +76,23 @@ public final class CapeCommand implements CommandExecutor, TabCompleter {
      * Handle /cape list - show available capes.
      */
     private void handleList(Player player, Audience audience, Config config) {
-        sendMessage(audience, config.getPrefix() + config.getListHeader());
+        List<CapesListResponse.CapeInfo> capes = plugin.getAvailableCapes();
         
-        for (CapeType capeType : CapeType.values()) {
+        if (capes == null || capes.isEmpty()) {
+            sendMessage(audience, config.getPrefix() + "<yellow>Loading available capes...");
+            // Trigger a refresh and try again later
+            plugin.refreshAvailableCapes();
+            return;
+        }
+
+        String backend = plugin.getApiBackend();
+        sendMessage(audience, config.getPrefix() + config.getListHeader() + 
+            " <gray>(backend: " + backend + ")");
+        
+        for (CapesListResponse.CapeInfo cape : capes) {
+            String availability = cape.isAvailable() ? "<green>✓" : "<red>✗";
             String entry = config.getListEntry()
-                .replace("%cape%", capeType.getId() + " <gray>(" + capeType.getDisplayName() + ")");
+                .replace("%cape%", cape.getId() + " <gray>(" + cape.getName() + ") " + availability);
             sendMessage(audience, entry);
         }
     }
@@ -120,6 +132,13 @@ public final class CapeCommand implements CommandExecutor, TabCompleter {
         if (capeType == null) {
             String message = config.getCapeNotFound().replace("%cape%", capeTypeId);
             sendMessage(audience, config.getPrefix() + message);
+            return;
+        }
+
+        // Check if cape is available from the API
+        if (!plugin.isCapeAvailable(capeTypeId)) {
+            sendMessage(audience, config.getPrefix() + 
+                "<red>This cape is not currently available. Use <white>/cape list</white> to see available capes.");
             return;
         }
 
@@ -215,9 +234,19 @@ public final class CapeCommand implements CommandExecutor, TabCompleter {
                 completions.add("reload");
             }
             
-            // Add cape types
-            for (CapeType capeType : CapeType.values()) {
-                completions.add(capeType.getId());
+            // Add only available cape types
+            List<CapesListResponse.CapeInfo> capes = plugin.getAvailableCapes();
+            if (capes != null) {
+                for (CapesListResponse.CapeInfo cape : capes) {
+                    if (cape.isAvailable()) {
+                        completions.add(cape.getId());
+                    }
+                }
+            } else {
+                // Fallback to all cape types if not yet loaded
+                for (CapeType capeType : CapeType.values()) {
+                    completions.add(capeType.getId());
+                }
             }
             
             return completions.stream()
