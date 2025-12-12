@@ -10,9 +10,11 @@ import org.bukkit.plugin.java.JavaPlugin;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * Main entry point for the Custom Capes Bukkit/Paper plugin.
@@ -26,10 +28,21 @@ public final class CustomCapesPlugin extends JavaPlugin {
     private BukkitAudiences audiences;
     private SkinApplierBukkit skinApplier;
 
-    /** Cached list of available capes from the API */
-    private volatile List<CapesListResponse.CapeInfo> availableCapes;
-    /** Set of available cape IDs for quick lookup */
-    private volatile Set<String> availableCapeIds = ConcurrentHashMap.newKeySet();
+    /**
+     * Container for cape data that must be updated atomically together.
+     */
+    private static final class CapeData {
+        final List<CapesListResponse.CapeInfo> capes;
+        final Set<String> availableIds;
+
+        CapeData(List<CapesListResponse.CapeInfo> capes, Set<String> availableIds) {
+            this.capes = capes;
+            this.availableIds = availableIds;
+        }
+    }
+
+    /** Atomically updated cape data (null = not yet loaded) */
+    private final AtomicReference<CapeData> capeData = new AtomicReference<>(null);
 
     @Override
     public void onEnable() {
@@ -69,8 +82,7 @@ public final class CustomCapesPlugin extends JavaPlugin {
             try {
                 CapesListResponse response = apiClient.getAvailableCapes();
 
-                // Build new set atomically to avoid race conditions
-                // where isCapeAvailable() returns false during refresh
+                // Build new set of available cape IDs
                 Set<String> newAvailableIds = ConcurrentHashMap.newKeySet();
                 for (CapesListResponse.CapeInfo cape : response.getCapes()) {
                     if (cape.isAvailable()) {
@@ -78,9 +90,8 @@ public final class CustomCapesPlugin extends JavaPlugin {
                     }
                 }
 
-                // Atomically swap the references
-                availableCapes = response.getCapes();
-                availableCapeIds = newAvailableIds;
+                // Atomically swap both fields together to prevent race conditions
+                capeData.set(new CapeData(response.getCapes(), newAvailableIds));
 
                 long availableCount = response.getCapes().stream().filter(CapesListResponse.CapeInfo::isAvailable)
                         .count();
@@ -142,7 +153,8 @@ public final class CustomCapesPlugin extends JavaPlugin {
      */
     @Nullable
     public List<CapesListResponse.CapeInfo> getAvailableCapes() {
-        return availableCapes;
+        CapeData data = capeData.get();
+        return data != null ? data.capes : null;
     }
 
     /**
@@ -151,10 +163,14 @@ public final class CustomCapesPlugin extends JavaPlugin {
      * (the API will validate availability server-side).
      */
     public boolean isCapeAvailable(@NotNull String capeId) {
+        CapeData data = capeData.get();
+        
         // If capes haven't been loaded yet, allow the request - API will validate
-        if (availableCapes == null || availableCapeIds.isEmpty()) {
+        if (data == null) {
             return true;
         }
-        return availableCapeIds.contains(capeId.toLowerCase());
+        
+        // Check against the loaded available IDs
+        return data.availableIds.contains(capeId.toLowerCase());
     }
 }
