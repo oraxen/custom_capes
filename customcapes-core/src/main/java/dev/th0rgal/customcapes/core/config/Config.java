@@ -15,7 +15,7 @@ import java.util.Map;
  */
 public final class Config {
 
-    private static final String DEFAULT_API_URL = "http://localhost:3000";
+    private static final String DEFAULT_API_URL = "https://customcapes.thomas.md";
     private static final int DEFAULT_TIMEOUT_SECONDS = 30;
 
     private String apiUrl;
