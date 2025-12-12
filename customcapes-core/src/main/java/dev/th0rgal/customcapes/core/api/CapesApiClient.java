@@ -121,6 +121,69 @@ public final class CapesApiClient {
         }
     }
 
+    /**
+     * Fetch the list of available capes from the API.
+     *
+     * @return Response containing available capes and the backend type
+     * @throws CapesApiException if the request fails
+     */
+    @NotNull
+    public CapesListResponse getAvailableCapes() throws CapesApiException {
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(baseUrl + "/capes"))
+                .header("Accept", "application/json")
+                .timeout(timeout)
+                .GET()
+                .build();
+
+        try {
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            
+            if (response.statusCode() != 200) {
+                throw new CapesApiException("API returned status " + response.statusCode() + ": " + response.body());
+            }
+
+            CapesListResponse capesResponse = GSON.fromJson(response.body(), CapesListResponse.class);
+            if (capesResponse == null || !capesResponse.isSuccess()) {
+                throw new CapesApiException("Failed to fetch available capes");
+            }
+
+            return capesResponse;
+        } catch (IOException e) {
+            throw new CapesApiException("Network error: " + e.getMessage(), e);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new CapesApiException("Request interrupted", e);
+        }
+    }
+
+    /**
+     * Asynchronously fetch the list of available capes from the API.
+     *
+     * @return CompletableFuture containing available capes
+     */
+    @NotNull
+    public CompletableFuture<CapesListResponse> getAvailableCapesAsync() {
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(baseUrl + "/capes"))
+                .header("Accept", "application/json")
+                .timeout(timeout)
+                .GET()
+                .build();
+
+        return httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString())
+                .thenApply(response -> {
+                    if (response.statusCode() != 200) {
+                        throw new CapesApiException("API returned status " + response.statusCode());
+                    }
+                    CapesListResponse capesResponse = GSON.fromJson(response.body(), CapesListResponse.class);
+                    if (capesResponse == null || !capesResponse.isSuccess()) {
+                        throw new CapesApiException("Failed to fetch available capes");
+                    }
+                    return capesResponse;
+                });
+    }
+
     private TextureData parseResponse(HttpResponse<String> response) throws CapesApiException {
         if (response.statusCode() != 200) {
             throw new CapesApiException("API returned status " + response.statusCode() + ": " + response.body());
