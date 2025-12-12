@@ -110,7 +110,16 @@ public final class CustomCapesApiProvider implements SkinApiProvider {
             throw new SkinApiException("API returned status " + response.statusCode() + ": " + response.body());
         }
 
-        GenerateResponse generateResponse = GSON.fromJson(response.body(), GenerateResponse.class);
+        GenerateResponse generateResponse;
+        try {
+            generateResponse = GSON.fromJson(response.body(), GenerateResponse.class);
+        } catch (Exception e) {
+            throw new SkinApiException("Failed to parse API response: " + e.getMessage(), e);
+        }
+
+        if (generateResponse == null) {
+            throw new SkinApiException("API returned empty response");
+        }
 
         if (!generateResponse.isSuccess()) {
             String error = generateResponse.getError();

@@ -223,6 +223,13 @@ public final class MineSkinApiProvider implements SkinApiProvider {
             throw new SkinApiException("MineSkin response missing texture.data");
         }
 
+        if (!data.has("value") || data.get("value").isJsonNull()) {
+            throw new SkinApiException("MineSkin response missing texture.data.value");
+        }
+        if (!data.has("signature") || data.get("signature").isJsonNull()) {
+            throw new SkinApiException("MineSkin response missing texture.data.signature");
+        }
+
         String value = data.get("value").getAsString();
         String signature = data.get("signature").getAsString();
 
