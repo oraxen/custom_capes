@@ -73,7 +73,7 @@ Possible cape types (availability depends on API backend):
 
 ```yaml
 api:
-  url: "https://customcapes.thomas.md"  # URL to the Custom Capes API
+  url: "https://ccapi.thomas.md"  # URL to the Custom Capes API
   timeout_seconds: 30           # Request timeout
 
 messages:
