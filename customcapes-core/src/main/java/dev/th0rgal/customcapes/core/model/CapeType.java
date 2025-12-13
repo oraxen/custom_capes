@@ -21,7 +21,7 @@ public enum CapeType {
     MINECON_2016("minecon_2016", "Minecon 2016"),
     MOJANG("mojang", "Mojang"),
     MOJANG_CLASSIC("mojang_classic", "Mojang Classic"),
-    MOJANG_STUDIOS("mojang_studios", "Mojang Studios"),
+    MENACE("menace", "Menace"),
     REALMS_MAPMAKER("realms_mapmaker", "Realms Mapmaker"),
     COBALT("cobalt", "Cobalt"),
     SCROLLS("scrolls", "Scrolls"),
@@ -32,13 +32,13 @@ public enum CapeType {
     MIGRATOR("migrator", "Migrator"),
     CHERRY_BLOSSOM("cherry_blossom", "Cherry Blossom"),
     ANNIVERSARY_15TH("anniversary_15th", "15th Anniversary"),
-    PRIDE_2021("pride_2021", "Pride 2021"),
+    PAN("pan", "Pan"),
     PURPLE_HEART("purple_heart", "Purple Heart"),
-    PROGRESS_PRIDE("progress_pride", "Progress Pride"),
+    HOME("home", "Home"),
     MOJANG_OFFICE("mojang_office", "Mojang Office"),
-    YEARNING("yearning", "Yearning"),
+    YEARN("yearn", "Yearn"),
     FOLLOWERS("followers", "Followers"),
-    VANILLA_CAPE("vanilla_cape", "Vanilla Cape");
+    COMMON("common", "Common");
 
     private static final Map<String, CapeType> BY_ID = Arrays.stream(values())
             .collect(Collectors.toMap(CapeType::getId, Function.identity()));
