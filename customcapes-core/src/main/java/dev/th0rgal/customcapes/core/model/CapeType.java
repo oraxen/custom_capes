@@ -84,4 +84,3 @@ public enum CapeType {
         return BY_ID.containsKey(id.toLowerCase());
     }
 }
-
