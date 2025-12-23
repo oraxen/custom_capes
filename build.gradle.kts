@@ -10,7 +10,6 @@ val pluginVersion: String by project
 
 allprojects {
     apply(plugin = "java")
-    apply(plugin = "com.github.johnrengelman.shadow")
 
     group = "dev.th0rgal.skinmotion"
     version = pluginVersion
@@ -57,6 +56,8 @@ project(":skinmotion-core") {
 }
 
 project(":skinmotion-bukkit") {
+    apply(plugin = "com.github.johnrengelman.shadow")
+    
     dependencies {
         compileOnly("io.papermc.paper:paper-api:1.20.4-R0.1-SNAPSHOT")
         compileOnly("org.jetbrains:annotations:24.0.1")
@@ -68,11 +69,29 @@ project(":skinmotion-bukkit") {
         implementation("org.yaml:snakeyaml:2.2")
     }
     
-    tasks.shadowJar {
+    tasks.named<com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar>("shadowJar") {
+        archiveClassifier.set("")
+        archiveFileName.set("skinmotion-bukkit-${pluginVersion}.jar")
+        
         relocate("org.bstats", "dev.th0rgal.skinmotion.shaded.bstats")
         relocate("net.kyori.adventure.platform.bukkit", "dev.th0rgal.skinmotion.shaded.adventure.platform.bukkit")
         relocate("org.yaml.snakeyaml", "dev.th0rgal.skinmotion.shaded.snakeyaml")
         relocate("org.java_websocket", "dev.th0rgal.skinmotion.shaded.websocket")
+        
+        manifest {
+            attributes(
+                "Built-By" to System.getProperty("user.name"),
+                "Version" to pluginVersion,
+                "Build-Timestamp" to SimpleDateFormat("yyyy-MM-dd' 'HH:mm:ss.SSSZ").format(Date()),
+                "Created-By" to "Gradle ${gradle.gradleVersion}",
+                "Build-Jdk" to "${System.getProperty("java.version")} (${System.getProperty("java.vendor")} ${System.getProperty("java.vm.version")})",
+                "Build-OS" to "${System.getProperty("os.name")} ${System.getProperty("os.arch")} ${System.getProperty("os.version")}"
+            )
+        }
+    }
+    
+    tasks.named("build") {
+        dependsOn(tasks.named("shadowJar"))
     }
 }
 
@@ -80,9 +99,10 @@ project(":skinmotion-bungee") {
     dependencies {
         compileOnly("net.md-5:bungeecord-api:1.20-R0.2")
         compileOnly("org.jetbrains:annotations:24.0.1")
-        compileOnly(project(path = ":skinmotion-core", configuration = "shadow"))
+        implementation(project(":skinmotion-core"))
 
         implementation("net.kyori:adventure-platform-bungeecord:4.3.2")
+        implementation("net.kyori:adventure-text-minimessage:4.14.0")
         implementation("org.bstats:bstats-bungeecord:3.0.2")
     }
 }
@@ -91,39 +111,23 @@ project(":skinmotion-velocity") {
     dependencies {
         compileOnly("com.velocitypowered:velocity-api:3.3.0-SNAPSHOT")
         compileOnly("org.jetbrains:annotations:24.0.1")
-        compileOnly(project(path = ":skinmotion-core", configuration = "shadow"))
+        implementation(project(":skinmotion-core"))
         annotationProcessor("com.velocitypowered:velocity-api:3.3.0-SNAPSHOT")
 
         implementation("org.bstats:bstats-velocity:3.0.2")
     }
 }
 
-tasks.shadowJar {
-    relocate("org.bstats", "dev.th0rgal.skinmotion.shaded.bstats")
-    relocate("net.kyori.adventure.platform.bukkit", "dev.th0rgal.skinmotion.shaded.adventure.platform.bukkit")
-    relocate("org.yaml.snakeyaml", "dev.th0rgal.skinmotion.shaded.snakeyaml")
-    relocate("org.java_websocket", "dev.th0rgal.skinmotion.shaded.websocket")
-    
-    manifest {
-        attributes(
-            "Built-By" to System.getProperty("user.name"),
-            "Version" to pluginVersion,
-            "Build-Timestamp" to SimpleDateFormat("yyyy-MM-dd' 'HH:mm:ss.SSSZ").format(Date()),
-            "Created-By" to "Gradle ${gradle.gradleVersion}",
-            "Build-Jdk" to "${System.getProperty("java.version")} (${System.getProperty("java.vendor")} ${System.getProperty("java.vm.version")})",
-            "Build-OS" to "${System.getProperty("os.name")} ${System.getProperty("os.arch")} ${System.getProperty("os.version")}"
-        )
+// Root project: copy the bukkit jar to build/libs as the main artifact
+tasks.register<Copy>("copyBukkitJar") {
+    dependsOn(":skinmotion-bukkit:shadowJar", ":skinmotion-bukkit:jar")
+    from(project(":skinmotion-bukkit").layout.buildDirectory.dir("libs")) {
+        include("skinmotion-bukkit-${pluginVersion}.jar")
     }
-    archiveFileName.set("skinmotion-${pluginVersion}.jar")
+    into(layout.buildDirectory.dir("libs"))
+    rename("skinmotion-bukkit-${pluginVersion}.jar", "skinmotion-${pluginVersion}.jar")
 }
 
-dependencies {
-    implementation(project(path = ":skinmotion-core", configuration = "shadow"))
-    implementation(project(path = ":skinmotion-bukkit", configuration = "shadow"))
-    implementation(project(path = ":skinmotion-bungee", configuration = "shadow"))
-    implementation(project(path = ":skinmotion-velocity", configuration = "shadow"))
-}
-
-tasks.build {
-    dependsOn(tasks.shadowJar)
+tasks.named("build") {
+    dependsOn("copyBukkitJar")
 }
